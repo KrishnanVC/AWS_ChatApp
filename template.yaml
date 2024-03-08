@@ -1,0 +1,195 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  sam-app
+Transform: AWS::Serverless-2016-10-31
+Resources:
+  ConnectionTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: id
+        Type: String
+      ProvisionedThroughput:
+        ReadCapacityUnits: 2
+        WriteCapacityUnits: 2
+
+  MyApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Description: String
+      DisableExecuteApiEndpoint: false
+      Name: chat-app
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: $request.body.action
+      Tags:
+        Project: chat-app
+
+  MyDeployment:
+    Type: "AWS::ApiGatewayV2::Deployment"
+    DependsOn:
+      - MyConnectRoute
+      - MySendMessageRoute
+      - MyDisconnectRoute
+    Properties:
+      Description: My deployment
+      ApiId: !Ref MyApi
+
+  MyStage:
+    Type: "AWS::ApiGatewayV2::Stage"
+    Properties:
+      StageName: Prod
+      Description: Prod Stage
+      ApiId: !Ref MyApi
+      DeploymentId: !Ref MyDeployment
+
+  ConnectFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/connect.lambda_handler
+      Runtime: python3.11
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      Description: Handles connection
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConnectionTable
+
+  MyConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MyApi
+      RouteKey: "$connect"
+      AuthorizationType: NONE
+      Target: !Sub "integrations/${ConnectIntegration}"
+
+  ConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref MyApi
+      Description: Connect Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConnectFn.Arn}/invocations
+
+  ConnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ConnectFn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${MyApi}/*/$connect"
+
+  SendMessageFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/send_message.lambda_handler
+      Runtime: python3.11
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      Description: Sends Messages
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConnectionTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - "execute-api:ManageConnections"
+              Resource:
+                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${MyApi}/*"
+
+  MySendMessageRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MyApi
+      RouteKey: "send"
+      AuthorizationType: NONE
+      Target: !Sub "integrations/${SendMessageIntegration}"
+
+  SendMessageIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref MyApi
+      Description: Send Message Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SendMessageFn.Arn}/invocations
+
+  SendMessagePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref SendMessageFn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${MyApi}/*/send"
+
+  DisconnectFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/disconnect.lambda_handler
+      Runtime: python3.11
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      Description: Handles disconnection
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConnectionTable
+
+  MyDisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MyApi
+      RouteKey: "$disconnect"
+      AuthorizationType: NONE
+      Target: !Sub "integrations/${DisconnectIntegration}"
+
+  DisconnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref MyApi
+      Description: Disconnect Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DisconnectFn.Arn}/invocations
+
+  DisconnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref DisconnectFn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${MyApi}/*/$disconnect"
+
+Outputs:
+  ConnectionsTableArn:
+    Description: "Connections table ARN"
+    Value: !GetAtt ConnectionTable.Arn
+
+  ConnectFnArn:
+    Description: "OnConnect function ARN"
+    Value: !GetAtt ConnectFn.Arn
+
+  DisconnectFnArn:
+    Description: "OnDisconnect function ARN"
+    Value: !GetAtt DisconnectFn.Arn
+
+  SendMessageFnArn:
+    Description: "SendMessage function ARN"
+    Value: !GetAtt SendMessageFn.Arn
+
+  WebSocketURI:
+    Description: "The WSS Protocol URI to connect to"
+    Value:
+      !Join [
+        "",
+        [
+          "wss://",
+          !Ref MyApi,
+          ".execute-api.",
+          !Ref "AWS::Region",
+          ".amazonaws.com/",
+          !Ref "MyStage",
+        ],
+      ]
