@@ -80,6 +80,13 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${MyApi}/*/$connect"
 
+  ConnectionResponse:
+    Type: "AWS::ApiGatewayV2::RouteResponse"
+    Properties:
+      RouteId: !Ref MyConnectRoute
+      ApiId: !Ref MyApi
+      RouteResponseKey: $connect
+
   SendMessageFn:
     Type: AWS::Serverless::Function
     Properties:
@@ -123,6 +130,13 @@ Resources:
       FunctionName: !Ref SendMessageFn
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${MyApi}/*/send"
+
+  SendMessageResponse:
+    Type: "AWS::ApiGatewayV2::RouteResponse"
+    Properties:
+      RouteId: !Ref MySendMessageRoute
+      ApiId: !Ref MyApi
+      RouteResponseKey: send
 
   DisconnectFn:
     Type: AWS::Serverless::Function
