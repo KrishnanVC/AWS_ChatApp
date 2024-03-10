@@ -1,15 +1,36 @@
 import logging
+import json
+import os
+import boto3
+from botocore.exceptions import ClientError
 
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 def lambda_handler(event, context):
     logger.info(event)
     connection_id = event["requestContext"]["connectionId"]
+    user_id = event["queryStringParameters"]["name"]
+    table_name = os.environ["TABLE_NAME"]
+    table = boto3.resource("dynamodb").Table(table_name)
+    try:
+        table.put_item(Item={"id": connection_id, "user_id": user_id})
+        logger.info(f"Added connection {connection_id} for user {user_id}.")
+    except ClientError as e:
+        logger.exception(
+            f"Couldn't add connection {connection_id} for user {user_id} due to error {e}" 
+        )
+        return {
+            "statusCode": 500,
+            "body": json.dumps({
+              "message": "Connection unsuccessful",
+            })
+          }
+
     return {
         "statusCode": 200,
-        "body": {
-          "message": "Connection successful",
-          "connection_id": connection_id
-        }    
-    }
+        "body": json.dumps({
+            "message": "Connection successful",
+            "connection_id": connection_id
+          })    
+        }

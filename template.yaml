@@ -55,6 +55,9 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ConnectionTable
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ConnectionTable
 
   MyConnectRoute:
     Type: AWS::ApiGatewayV2::Route
@@ -80,13 +83,6 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${MyApi}/*/$connect"
 
-  ConnectionResponse:
-    Type: "AWS::ApiGatewayV2::RouteResponse"
-    Properties:
-      RouteId: !Ref MyConnectRoute
-      ApiId: !Ref MyApi
-      RouteResponseKey: $connect
-
   SendMessageFn:
     Type: AWS::Serverless::Function
     Properties:
@@ -106,6 +102,9 @@ Resources:
                 - "execute-api:ManageConnections"
               Resource:
                 - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${MyApi}/*"
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ConnectionTable
 
   MySendMessageRoute:
     Type: AWS::ApiGatewayV2::Route
@@ -131,13 +130,6 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${MyApi}/*/send"
 
-  SendMessageResponse:
-    Type: "AWS::ApiGatewayV2::RouteResponse"
-    Properties:
-      RouteId: !Ref MySendMessageRoute
-      ApiId: !Ref MyApi
-      RouteResponseKey: send
-
   DisconnectFn:
     Type: AWS::Serverless::Function
     Properties:
@@ -151,6 +143,9 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ConnectionTable
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ConnectionTable
 
   MyDisconnectRoute:
     Type: AWS::ApiGatewayV2::Route
