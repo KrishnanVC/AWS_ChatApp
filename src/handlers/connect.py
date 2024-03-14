@@ -14,7 +14,8 @@ def lambda_handler(event, context):
     table_name = os.environ["TABLE_NAME"]
     table = boto3.resource("dynamodb").Table(table_name)
     try:
-        table.put_item(Item={"id": connection_id, "user_id": user_id})
+        # TODO: Need to change it to check for user id and if it exists update the connection id
+        table.put_item(Item={"connection_id": connection_id, "id": user_id})
         logger.info(f"Added connection {connection_id} for user {user_id}.")
     except ClientError as e:
         logger.exception(

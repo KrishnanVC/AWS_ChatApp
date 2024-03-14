@@ -2,6 +2,7 @@ import logging
 import os
 import json
 import boto3
+from boto3.dynamodb.conditions import Attr
 from botocore.exceptions import ClientError
 
 logger = logging.getLogger()
@@ -12,7 +13,18 @@ def lambda_handler(event, context):
     table_name = os.environ["TABLE_NAME"]
     table = boto3.resource("dynamodb").Table(table_name)
     try:
-        table.delete_item(Key={"id": connection_id})
+        item = table.scan(
+            FilterExpression=Attr("connection_id").eq(connection_id)
+        )["Items"]
+        user_id = item[0]["id"]
+
+        table.update_item(
+          Key={"id": user_id},
+          UpdateExpression="SET connection_id=:empty_string",
+          ExpressionAttributeValues={
+            ":empty_string": ""
+          }
+        )
         logger.info(f"Connection disconnected for connection: {connection_id}.")
     except ClientError as e:
         logger.exception(

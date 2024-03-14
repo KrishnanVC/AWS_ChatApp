@@ -17,32 +17,32 @@ def lambda_handler(event, context):
     
     body = json.loads(event["body"])
     message = body["message"]
+    send_to = body["send_to"]
     
     table_name = os.environ["TABLE_NAME"]
     table = boto3.resource("dynamodb").Table(table_name)
     try:
-      scan_response = table.scan(ProjectionExpression="id")
-      connection_ids = [item["id"] for item in scan_response["Items"]]
-      logger.info(f"Found {len(connection_ids)} active connections.")
+      item = table.get_item(Key={"id": send_to})["Item"]
+      other_connection_id = item["connection_id"]
+      logger.info(f"Found the connection ID: {connection_id} for user ID: {send_to}")
     except ClientError:
-      logger.exception("Couldn't get connections.")
-    
-    for other_connection_id in connection_ids:
-        try:
-            if other_connection_id != connection_id:
-              response = client.post_to_connection(
-                Data=str.encode(message),
-                ConnectionId=other_connection_id
-              )
-              logger.info(f"Posted message to connection {other_connection_id}, got response {response}.")
-        except ClientError:
-            logger.exception(f"Couldn't post to connection {other_connection_id}.")
-            return {
-                "statusCode": "500",
-                "body": "Unable to send the message"
-            }
+      logger.exception(f"Couldn't get connection ID for user ID: {send_to}")
+        
+    try:
+      response = client.post_to_connection(
+        Data=str.encode(message),
+        ConnectionId=other_connection_id
+      )
+      logger.info(f"Posted message to connection {other_connection_id}, got response {response}.")
       
-    return {
-      "statusCode": 200,
-      "body": "Message sent successfully"
-    }
+      return {
+        "statusCode": 200,
+        "body": "Message sent successfully"
+      }
+    except ClientError:
+        logger.exception(f"Couldn't post to connection ID: {other_connection_id}.")
+        return {
+            "statusCode": "500",
+            "body": "Unable to send the message"
+        }
+  
