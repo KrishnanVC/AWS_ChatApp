@@ -18,7 +18,8 @@ def lambda_handler(event, context):
     body = json.loads(event["body"])
     message = body["message"]
     send_to = body["send_to"]
-    
+    user_id = body["sent_by"]
+
     table_name = os.environ["TABLE_NAME"]
     table = boto3.resource("dynamodb").Table(table_name)
     try:
@@ -29,8 +30,14 @@ def lambda_handler(event, context):
       logger.exception(f"Couldn't get connection ID for user ID: {send_to}")
         
     try:
+      data = {
+         "sent_by": user_id,
+         "message": message
+      }
+      data = json.dumps(data)
+      data = str.encode(data)
       response = client.post_to_connection(
-        Data=str.encode(message),
+        Data=data,
         ConnectionId=other_connection_id
       )
       logger.info(f"Posted message to connection {other_connection_id}, got response {response}.")
