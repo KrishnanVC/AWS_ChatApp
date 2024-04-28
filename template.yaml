@@ -38,7 +38,7 @@ Resources:
     Type: "AWS::ApiGatewayV2::Stage"
     Properties:
       StageName: Prod
-      Description: Prod Stage
+      Description: Production Stage
       ApiId: !Ref MyApi
       DeploymentId: !Ref MyDeployment
 
@@ -202,3 +202,22 @@ Outputs:
           !Ref "MyStage",
         ],
       ]
+
+  # Authorizer:
+  #   Type: "AWS::ApiGatewayV2::Authorizer"
+  #   Properties:
+  #     Name: LambdaAuthorizer
+  #     ApiId: !Ref MyApi
+  #     AuthorizerType: REQUEST
+  #     AuthorizerCredentialsArn: Arn
+  #     AuthorizerUri: !Join
+  #       - ""
+  #       - - "arn:"
+  #         - !Ref "AWS::Partition"
+  #         - ":apigateway:"
+  #         - !Ref "AWS::Region"
+  #         - ":lambda:path/2015-03-31/functions/"
+  #         - /invocations
+  #     AuthorizerResultTtlInSeconds: 500
+  #     IdentitySource:
+  #       - route.request.header.Auth
