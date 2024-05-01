@@ -2,6 +2,11 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: >-
   sam-app
 Transform: AWS::Serverless-2016-10-31
+Parameters:
+  CognitoArn:
+    Type: String
+    Description: "Arn for the Cognito User Pool"
+
 Resources:
   ConnectionTable:
     Type: AWS::Serverless::SimpleTable
@@ -64,7 +69,8 @@ Resources:
     Properties:
       ApiId: !Ref MyApi
       RouteKey: "$connect"
-      AuthorizationType: NONE
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref Authorizer
       Target: !Sub "integrations/${ConnectIntegration}"
 
   ConnectIntegration:
@@ -171,6 +177,42 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${MyApi}/*/$disconnect"
 
+  AuthorizerFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/authorizer.lambda_handler
+      Runtime: python3.11
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      Description: Handles authorization
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - "cognito-idp:GetUser"
+              Resource: !Ref CognitoArn
+      Environment:
+        Variables:
+          METHOD_ARN: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${MyApi}/*"
+
+  AuthorizerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref AuthorizerFn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${MyApi}/authorizers/${Authorizer}"
+
+  Authorizer:
+    Type: "AWS::ApiGatewayV2::Authorizer"
+    Properties:
+      Name: LambdaAuthorizer
+      ApiId: !Ref MyApi
+      AuthorizerType: REQUEST
+      AuthorizerUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerFn.Arn}/invocations
+
 Outputs:
   ConnectionsTableArn:
     Description: "Connections table ARN"
@@ -202,22 +244,3 @@ Outputs:
           !Ref "MyStage",
         ],
       ]
-
-  # Authorizer:
-  #   Type: "AWS::ApiGatewayV2::Authorizer"
-  #   Properties:
-  #     Name: LambdaAuthorizer
-  #     ApiId: !Ref MyApi
-  #     AuthorizerType: REQUEST
-  #     AuthorizerCredentialsArn: Arn
-  #     AuthorizerUri: !Join
-  #       - ""
-  #       - - "arn:"
-  #         - !Ref "AWS::Partition"
-  #         - ":apigateway:"
-  #         - !Ref "AWS::Region"
-  #         - ":lambda:path/2015-03-31/functions/"
-  #         - /invocations
-  #     AuthorizerResultTtlInSeconds: 500
-  #     IdentitySource:
-  #       - route.request.header.Auth
