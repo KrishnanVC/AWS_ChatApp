@@ -10,6 +10,7 @@ cognito = boto3.client('cognito-idp')
 def lambda_handler(event, context):
     logger.info(event)
     token = event["headers"]["Sec-WebSocket-Protocol"]
+    token = token.split(",")[1].strip()
     method_arn: str = os.environ["METHOD_ARN"]
 
     try:
@@ -18,7 +19,6 @@ def lambda_handler(event, context):
         )
         user = response["Username"]
         logger.info(user)
-
         policy = generate_policy(user, 'Allow', method_arn)
     except Exception as e:
         policy = generate_policy(user, 'Deny', method_arn)
