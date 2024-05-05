@@ -63,7 +63,6 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref ConnectionTable
-
   MyConnectRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
@@ -72,7 +71,6 @@ Resources:
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref Authorizer
       Target: !Sub "integrations/${ConnectIntegration}"
-
   ConnectIntegration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
@@ -80,7 +78,6 @@ Resources:
       Description: Connect Integration
       IntegrationType: AWS_PROXY
       IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConnectFn.Arn}/invocations
-
   ConnectPermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -111,7 +108,6 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref ConnectionTable
-
   MySendMessageRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
@@ -119,7 +115,6 @@ Resources:
       RouteKey: "send"
       AuthorizationType: NONE
       Target: !Sub "integrations/${SendMessageIntegration}"
-
   SendMessageIntegration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
@@ -127,7 +122,6 @@ Resources:
       Description: Send Message Integration
       IntegrationType: AWS_PROXY
       IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SendMessageFn.Arn}/invocations
-
   SendMessagePermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -135,6 +129,50 @@ Resources:
       FunctionName: !Ref SendMessageFn
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${MyApi}/*/send"
+
+  ListUserFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/list_users.lambda_handler
+      Runtime: python3.11
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      Description: List Users
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConnectionTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - "execute-api:ManageConnections"
+              Resource:
+                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${MyApi}/*"
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ConnectionTable
+  MyListUserRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MyApi
+      RouteKey: "users"
+      AuthorizationType: NONE
+      Target: !Sub "integrations/${ListUserIntegration}"
+  ListUserIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref MyApi
+      Description: List User Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ListUserFn.Arn}/invocations
+  ListUserPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ListUserFn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${MyApi}/*/users"
 
   DisconnectFn:
     Type: AWS::Serverless::Function
@@ -152,7 +190,6 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref ConnectionTable
-
   MyDisconnectRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
@@ -160,7 +197,6 @@ Resources:
       RouteKey: "$disconnect"
       AuthorizationType: NONE
       Target: !Sub "integrations/${DisconnectIntegration}"
-
   DisconnectIntegration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
@@ -168,7 +204,6 @@ Resources:
       Description: Disconnect Integration
       IntegrationType: AWS_PROXY
       IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DisconnectFn.Arn}/invocations
-
   DisconnectPermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -196,7 +231,6 @@ Resources:
       Environment:
         Variables:
           METHOD_ARN: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${MyApi}/*"
-
   AuthorizerPermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -204,7 +238,6 @@ Resources:
       FunctionName: !Ref AuthorizerFn
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${MyApi}/authorizers/${Authorizer}"
-
   Authorizer:
     Type: "AWS::ApiGatewayV2::Authorizer"
     Properties:
