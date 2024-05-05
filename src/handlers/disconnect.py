@@ -12,7 +12,6 @@ def disconnect(connection_id):
   table_name: str = os.environ["TABLE_NAME"]
   table = boto3.resource("dynamodb").Table(table_name)
   try:
-    # A simple put item must be enough
       item = table.scan(
           FilterExpression=Attr("connection_id").eq(connection_id)
       )["Items"]
@@ -44,5 +43,6 @@ def disconnect(connection_id):
         }
 
 def lambda_handler(event, context):
+  logger.info(event)
   connection_id: str = event["requestContext"]["connectionId"]
   disconnect(connection_id)

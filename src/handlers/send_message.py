@@ -24,7 +24,8 @@ def send_message(client, connection_id, user_id, send_to, message):
   try:
     data = {
         "sent_by": user_id,
-        "message": message
+        "message": message,
+        "action": "send"
     }
     data = json.dumps(data)
     data = str.encode(data)
