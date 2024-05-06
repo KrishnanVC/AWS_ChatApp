@@ -21,7 +21,7 @@ Resources:
   MyApi:
     Type: AWS::ApiGatewayV2::Api
     Properties:
-      Description: String
+      Description: My API gateway
       DisableExecuteApiEndpoint: false
       Name: chat-app
       ProtocolType: WEBSOCKET

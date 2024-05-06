@@ -45,4 +45,4 @@ def disconnect(connection_id):
 def lambda_handler(event, context):
   logger.info(event)
   connection_id: str = event["requestContext"]["connectionId"]
-  disconnect(connection_id)
+  return disconnect(connection_id)
